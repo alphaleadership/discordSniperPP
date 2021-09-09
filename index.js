@@ -118,7 +118,36 @@ client.on('message', async (message) => {
                     }]).setFooter(`Created by ImLorio`).setColor(newColor())
                 );
             };
+        break; case `config`:
             
+            if (args[0] === 'prefix') {
+                let newPrefix = args.slice(1)
+                
+                message.reply(`__Nouveau prefix:__\`${opt.prefix}\` -> \`${newPrefix}\``);
+                opt.prefix = newPrefix;
+
+                saveConfig()
+            } else if (args[0] === 'timer') {
+                let newTimer = args[1]
+                if (isNaN(newTimer)) return message.reply(`__**ERREUR**__: Votre nombre n'est pas valide`);
+                if (newTimer < 1200) return message.reply(`__**ERREUR**__: Votre nombre est trop petit. (min: 1200)`);
+                
+                message.reply(new MessageEmbed().setDescription(`__New timer:__\`${opt.time}\` -> \`${newTimer}\``).setFooter(`Created by ImLorio`).setColor(newColor()))
+                opt.time = newTimer;
+
+                saveConfig()
+            } else {
+                message.reply(
+                    new MessageEmbed().setTitle(`Configuration Help Menu`)
+                    .addFields([{
+                        name: `\`${opt.prefix}config prefix <prefix>\``,
+                        value: `Change current prefix to custom prefix.`
+                    }, {
+                        name: `\`${opt.prefix}channel timer <time>\``,
+                        value: `Change current timer to custom timer (in ms) Min: 1200ms`
+                    }]).setFooter(`Created by ImLorio`).setColor(newColor())
+                );
+            }
             
         break;
         default:
@@ -134,12 +163,8 @@ client.on('message', async (message) => {
     }
     if (message.content.toLowerCase().startsWith(`${opt.prefix}timer`)) { // command config timer
         let newTimer = message.content.split(' ').slice(1)[0];
-        if (isNaN(newTimer)) return message.reply(`__**ERREUR**__: Votre nombre n'est pas valide`);
-        if (newTimer < 1200) return message.reply(`__**ERREUR**__: Votre nombre est trop petit. (min: 1200)`);
         message.reply(`__Nouveau timer:__\`${opt.time}\` -> \`${newTimer}\``)
-        opt.time = newTimer;
         console.log('Set timer to ' + opt.time);
-        saveConfig()
     }
 })
 
@@ -170,9 +195,6 @@ function HSLtoRGB(h, s, l) {
 
     return [rd(r), rd(g), rd(b)]
 }
-/*function RGBtoHex(r, g, b) {
-    return `#${r.toString(16)}${g.toString(16)}${b.toString(16)}`;
-}*/
 function newColor() {
     const [r, g, b] = HSLtoRGB(Math.random(), 1, (Math.floor(Math.random() * 16) + 75) * .01);
     return `#${r.toString(16)}${g.toString(16)}${b.toString(16)}` // RGB to Hexa RGBtoHex(r, g, b)
