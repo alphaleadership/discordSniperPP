@@ -1,0 +1,9 @@
+{
+	"token": "yourToken",
+	"prefix": "-",
+	"time": "30000",
+	"channels": [],
+	"owners": [
+		"yourId"
+	]
+}
