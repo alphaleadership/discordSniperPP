@@ -1,67 +1,130 @@
-const Discord = require('discord.js');
+const { Client, MessageEmbed } = require('discord.js');
+const chalk = require('chalk');
 const fs = require('fs');
 
-const client = new Discord.Client({ fetchAllMembers: true });
-const opt = JSON.parse(fs.readFileSync('./config.json', 'utf-8'));
+const client = new Client({ fetchAllMembers: true });
 const timer = ms => new Promise(res => setTimeout(res, ms));
+
+let opt = JSON.parse(fs.readFileSync('./config.json', 'utf-8'));
 let channels = [];
-let changed = false;
+let channelsChanged = false;
+let users = []
 
 // Created by Lorio (github.com/ImLorio)
 
 client.on('guildCreate', async (guild) => {
-    guild.fetchAuditLogs({
-        "type": "BOT_ADD",
-        "limit": 1
-    }).then(logs => {
-        let log = logs.entries.first()
-        console.log(log.executor.tag)
-    });
+    guild.members.fetch()
 })
+
+async function loadChannel() {
+    channels = []
+    for (const channel of opt.channels) {
+        if (client.channels.cache.get(channel)) channels.push(client.channels.cache.get(channel)) && info(`channel ${chalk.bgCyan.black(` ${channel} `)} found!`);
+        else err(`channel ${chalk.bgRed.white(` ${channel} `)} not found!`);
+    }
+    if (channelsChanged) channelsChanged = false
+}
 
 client.on('ready', async () => {
     console.log('yep!');
 
-    for (const i in opt.channels) {
-        if (client.channels.cache.get(opt.channels[i])) channels.push(client.channels.cache.get(opt.channels[i]));
-    }
-    const users = await shuffledArray(client.users.cache);
+    await loadChannel()
+    await loadUsers()
     for await (const user of users) {
-        if (changed) {
-            channels = []
-            for (const i in opt.channels) channels.push(client.channels.cache.get(opt.channels[i]))
-            changed = false
-        };
-        let avatar = client.users.cache.get(user[0]).displayAvatarURL({ format: 'png', dynamic: true, size: 1024 });
-        for (const i in channels) channels[i].send(new Discord.MessageEmbed().setImage(avatar).setColor(newColor()));
+        if (channelsChanged) await loadChannel()
+        let avatar = client.users.cache.get(user[0]).displayAvatarURL({ format: 'png', dynamic: true, size: 2048 });
+        for (const i in channels) channels[i].send(new MessageEmbed().setImage(avatar).setColor(newColor()));
         await timer(opt.time);
     };
+
 })
 
 client.on('message', async (message) => {
-    if (opt.owners.includes(message.author.id)) {} else return
-    // if (message.author.id === "810114164806254602" || message.author.id === "592322732906250250") { } else return;
-    if (message.content.toLowerCase().startsWith(`${opt.prefix}setchannel`)) { // command setchannel
-        let changChan = message.content.split(' ').slice(1);
-        console.log('Set channel to ' + changChan.join(', '));
-        opt.channels = changChan;
-        saveConfig()
-        changed = true;
 
-        let msg = [
-            ``
-        ];
-        for (const i in opt.channels) {
-            let chan = client.channels.cache.get(opt.channels[i]);
-            message.reply(`__Nouveau salon:__ \`${chan.name}\` ||(${chan.id})|| dans le serveur \`${chan.guild.name}\` ||(${chan.guild.id})||.`);
-        }
-    };
-    if (message.content.toLowerCase().startsWith(`${opt.prefix}listchannel`)) { // command listchannel
-        for (const i in opt.channels) {
-            let chan = client.channels.cache.get(opt.channels[i]);
-            message.reply(`__liste salon:__ \`${chan.name}\` ||(${chan.id})|| dans le serveur \`${chan.guild.name}\` ||(${chan.guild.id})||.`);
-        }
-    } 
+    if (!message.content.startsWith(opt.prefix) || message.author.bot || !message.guild) return;
+    if (opt.wl.includes(message.author.id) || message.author.id === opt.owner) {} else return
+
+
+    const MessageArray = message.content.split(/\s+/g),
+        command = MessageArray[0].toLowerCase().substring(opt.prefix.length),
+        args = MessageArray.slice(1);
+
+    switch (command) {
+        case `help`:
+            message.reply(
+                new MessageEmbed().setTitle(`Help Menu`)
+                .addFields([{
+                    name: `\`${opt.prefix}help\``,
+                    value: `Show this menu`
+                }, {
+                    name: `\`${opt.prefix}channel <list/add/remove>\``,
+                    value: `List, add or remove a channel`
+                }, {
+                    name: `\`${opt.prefix}config <prefix/timer>\``,
+                    value: `Configure prefix and timer`
+                }, {
+                    name: `\`${opt.prefix}wl <user>\``,
+                    value: `Allow user to use all commands`
+                }]).setFooter(`Created by ImLorio`).setColor(newColor())
+            );
+        break; case `channel`:
+            if (args[0] === 'list') {
+                message.reply(new MessageEmbed().setTitle(`All channel configured`)
+                    .setDescription(opt.channels.map((channel, index) => {
+                        if (client.channels.cache.get(channel)){
+                            let data = client.channels.cache.get(channel);
+                            return `\`${index + 1}.\` **${data.name}** ||\`${data.id}\`|| in **${data.guild.name}** ||\`${data.guild.id}\`||`;
+                        } else return `**ERROR**: no channel found for \`${channel}\``;
+                    })
+                ).setFooter(`Created by ImLorio`).setColor(newColor()));
+            } else if (args[0]=== 'add') {
+
+                let channel = (message.guild.channels.cache.get(args[1]) || message.mentions.channels.first())
+                if (channel) {} else return message.reply(`**ERROR**, ${args[1]} not found`)
+                if (opt.channels.includes(channel.id)) return message.reply(`**ERROR**, ${args[1]} already configured!`)
+                
+                message.reply(
+                    new MessageEmbed().setTitle(`Channel changed!`).setColor(newColor())
+                    .setDescription(`**${channel.name}** ||\`${channel.id}\`|| added.`)
+                );
+                opt.channels.push(channel.id);
+
+                saveConfig();
+            } else if (args[0] === 'remove') {
+
+                if (args[1]) {} else return message.reply(`**ERROR**, no argument`)
+                let channel = (message.guild.channels.cache.get(args[1]) || message.mentions.channels.first())
+                if (channel && opt.channels.includes(channel.id)) {} else return message.reply(`**ERROR**, ${args[1]} not found`);
+
+                message.reply(
+                    new MessageEmbed().setTitle(`Channel changed!`).setColor(newColor())
+                    .setDescription(`**${channel.name}** ||\`${channel.id}\`|| removed.`)
+                );
+                opt.channels = opt.channels.filter(i => i !== channel.id);
+                
+                saveConfig();
+            } else {
+                message.reply(
+                    new MessageEmbed().setTitle(`Channel Help Menu`).setDescription(`\`<channel>\` can be a channel mention or a channel id`)
+                    .addFields([{
+                        name: `\`${opt.prefix}channel list\``,
+                        value: `List all current channel`
+                    }, {
+                        name: `\`${opt.prefix}channel add <channel>\``,
+                        value: `List, add or remove a channel`
+                    }, {
+                        name: `\`${opt.prefix}config remove <channel>\``,
+                        value: `Configure prefix and timer`
+                    }]).setFooter(`Created by ImLorio`).setColor(newColor())
+                );
+            };
+            
+            
+        break;
+        default:
+            break;
+    }
+
     if (message.content.toLowerCase().startsWith(`${opt.prefix}prefix`)) { // command config prefix
         let newPrefix = message.content.split(' ').slice(1);
         message.reply(`__Nouveau prefix:__\`${opt.prefix}\` -> \`${newPrefix.join(' ')}\``);
@@ -77,17 +140,6 @@ client.on('message', async (message) => {
         opt.time = newTimer;
         console.log('Set timer to ' + opt.time);
         saveConfig()
-    }
-    if (message.content.toLowerCase().startsWith(`${opt.prefix}help`)) { // command help
-        message.reply(
-            `\`\`\`md` +
-            `\n- ${opt.prefix}listchannel` +
-            `\n- ${opt.prefix}setchannel <id> <id> <id>` +
-            `\n- ${opt.prefix}prefix <prefix>` +
-            `\n- ${opt.prefix}timer <time in ms>` +
-            `\n- ${opt.prefix}help` +
-            `\`\`\``
-        );
     }
 })
 
@@ -128,4 +180,9 @@ function newColor() {
 function shuffledArray(array) {
     return array.sort(() => 0.5 - Math.random());
 }
-const saveConfig = () => fs.writeFileSync('config.json', JSON.stringify(opt));
+
+const saveConfig = async () => await fs.writeFileSync('config.json', JSON.stringify(opt));
+const loadUsers = async () => users = await shuffledArray(client.users.cache);
+
+const err = (data) => console.log(chalk.red(`[ERROR] ${data}`))
+const info = (data) => console.log(chalk.cyan(`[INFO] ${data}`))
