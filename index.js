@@ -5,7 +5,7 @@ const fs = require('fs');
 const client = new Client({ fetchAllMembers: true });
 const timer = ms => new Promise(res => setTimeout(res, ms));
 
-let opt = JSON.parse(fs.readFileSync('./config.json', 'utf-8'));
+let opt =require('./config.json')
 let channels = [];
 let channelsChanged = false;
 let users = []
